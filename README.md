@@ -1,8 +1,8 @@
-# NumberPredictionAI ✍️🔢
+# DigitPredictionAI ✍️🔢
 
 Draw a handwritten digit (0–9) in the browser and a neural network trained on MNIST will guess what it is — with a confidence percentage for every digit.
 
-**🌐 Live demo:** https://superhadtr.github.io/numberPredictionAI/
+**🌐 Live demo:** https://superhadtr.github.io/DigitRecognitionAI/
 
 ## How it works
 
