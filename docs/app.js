@@ -86,6 +86,8 @@ fetch("weights.json")
     MODEL = w;
     predictBtn.disabled = false;
     const acc = (w.test_accuracy * 100).toFixed(2);
+    document.getElementById("arch").textContent =
+      `Model: feedforward network (${w.arch.join(" → ")}) trained on MNIST.`;
     statusEl.textContent = `Model ready ✅ (test accuracy: %${acc}) — draw and release, it predicts automatically.`;
   })
   .catch((err) => {
@@ -147,10 +149,14 @@ function matvec(x, W, b) { // W: [in][out]
   return out;
 }
 function forward(input) {
-  const h1 = relu(matvec(input, MODEL.W1, MODEL.b1));
-  const h2 = relu(matvec(h1, MODEL.W2, MODEL.b2));
-  const mx = Math.max(...h2);
-  const e = h2.map((v) => Math.exp(v - mx));
+  let h = input;
+  const L = MODEL.layers;
+  for (let l = 0; l < L.length; l++) {
+    h = matvec(h, L[l].W, L[l].b);
+    if (l < L.length - 1) h = relu(h);
+  }
+  const mx = Math.max(...h);
+  const e = h.map((v) => Math.exp(v - mx));
   const sum = e.reduce((a, b) => a + b, 0);
   return e.map((v) => v / sum);
 }
