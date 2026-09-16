@@ -1,4 +1,4 @@
-// Rakam tanima: cizim -> 28x28 on-isleme -> ileri besleme -> yuzdeler
+// Digit recognition: drawing -> 28x28 preprocessing -> forward pass -> percentages
 const pad = document.getElementById("pad");
 const ctx = pad.getContext("2d", { willReadFrequently: true });
 const seen = document.getElementById("seen");
@@ -13,7 +13,7 @@ const N = 280;
 let MODEL = null;
 let drawing = false;
 
-// --- canvas kurulumu: siyah zemin (MNIST standardi) ---
+// --- canvas setup: black background (MNIST standard) ---
 function resetPad() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, N, N);
@@ -24,7 +24,7 @@ function resetPad() {
 }
 resetPad();
 
-// --- cizim ---
+// --- drawing ---
 function pos(e) {
   const r = pad.getBoundingClientRect();
   return [(e.clientX - r.left) * (N / r.width), (e.clientY - r.top) * (N / r.height)];
@@ -47,8 +47,8 @@ pad.addEventListener("pointermove", (e) => {
 function stopDraw() {
   if (!drawing) return;
   drawing = false;
-  ctx.beginPath(); // yarim kalan cizgiyi kapat
-  if (MODEL) predict(); // otomatik tahmin
+  ctx.beginPath(); // close the unfinished stroke
+  if (MODEL) predict(); // auto-predict
 }
 pad.addEventListener("pointerup", stopDraw);
 pad.addEventListener("pointercancel", stopDraw);
@@ -65,7 +65,7 @@ document.getElementById("clearBtn").addEventListener("click", () => {
 });
 predictBtn.addEventListener("click", predict);
 
-// --- yuzde cubuklari ---
+// --- percentage bars ---
 for (let d = 0; d <= 9; d++) {
   const row = document.createElement("div");
   row.className = "bar";
@@ -76,10 +76,10 @@ for (let d = 0; d <= 9; d++) {
   barsEl.appendChild(row);
 }
 
-// --- model yukle ---
+// --- load model ---
 fetch("weights.json")
   .then((r) => {
-    if (!r.ok) throw new Error("weights.json bulunamadi");
+    if (!r.ok) throw new Error("weights.json not found");
     return r.json();
   })
   .then((w) => {
@@ -92,13 +92,13 @@ fetch("weights.json")
     statusEl.textContent = "Failed to load model: " + err.message;
   });
 
-// --- 28x28 on-isleme (senin Python kodundakiyle ayni mantik) ---
+// --- 28x28 preprocessing (same logic as the Python code) ---
 function preprocess() {
   const img = ctx.getImageData(0, 0, N, N).data;
   let x0 = N, y0 = N, x1 = -1, y1 = -1;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
-      if (img[(y * N + x) * 4] > 20) { // beyaz piksel var mi
+      if (img[(y * N + x) * 4] > 20) { // is there a white pixel
         if (x < x0) x0 = x;
         if (x > x1) x1 = x;
         if (y < y0) y0 = y;
@@ -106,19 +106,19 @@ function preprocess() {
       }
     }
   }
-  if (x1 < 0) return null; // bos canvas
+  if (x1 < 0) return null; // empty canvas
 
   const m = 14;
   x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m);
   x1 = Math.min(N - 1, x1 + m); y1 = Math.min(N - 1, y1 + m);
   const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
 
-  // kirpilmis bolgeyi gecici canvas'a koy
+  // put the cropped region on a temporary canvas
   const crop = document.createElement("canvas");
   crop.width = cw; crop.height = ch;
   crop.getContext("2d").putImageData(ctx.getImageData(x0, y0, cw, ch), 0, 0);
 
-  // en-boy oranini koruyup 20x20'ye sigdir, 28x28'de ortala
+  // keep aspect ratio, fit into 20x20, center on 28x28
   const s = 20 / Math.max(cw, ch);
   const w = Math.max(1, Math.round(cw * s)), h = Math.max(1, Math.round(ch * s));
   seenCtx.fillStyle = "#000";
@@ -133,7 +133,7 @@ function preprocess() {
   return input;
 }
 
-// --- ileri besleme: x -> relu(x*W1+b1) -> relu(h*W2+b2) -> softmax ---
+// --- forward pass: x -> relu(x*W1+b1) -> relu(h*W2+b2) -> softmax ---
 function relu(a) { return a.map((v) => (v > 0 ? v : 0)); }
 function matvec(x, W, b) { // W: [in][out]
   const out = new Array(W[0].length).fill(0);
