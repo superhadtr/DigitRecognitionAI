@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rakam Tanıma AI</title>
+<title>Digit Recognition AI</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -44,17 +44,17 @@
 </style>
 </head>
 <body>
-  <h1>✍️ Rakam Tanıma AI</h1>
-  <p class="sub">Bir rakam çiz (0–9), yapay zekâ ne olduğunu tahmin etsin.<br>Model: senin notebook'undaki ağ (784 → 10 → 10).</p>
+  <h1>✍️ Digit Recognition AI</h1>
+  <p class="sub">Draw a digit (0–9) and the AI will try to guess it.<br>Model: the network from your notebook (784 → 10 → 10).</p>
 
   <div class="wrap">
     <div class="card">
       <canvas id="pad" width="280" height="280"></canvas>
       <div class="btns">
-        <button id="predictBtn" disabled>Tahmin Et</button>
-        <button id="clearBtn">Temizle</button>
+        <button id="predictBtn" disabled>Predict</button>
+        <button id="clearBtn">Clear</button>
       </div>
-      <div id="status">Model yükleniyor…</div>
+      <div id="status">Loading model…</div>
     </div>
 
     <div class="card result">
@@ -62,7 +62,7 @@
       <div id="bars" style="margin-top:12px"></div>
       <div class="seenrow">
         <canvas id="seen" width="28" height="28"></canvas>
-        <span>Ağın gördüğü<br>28×28 görüntü</span>
+        <span>The 28×28 image<br>the network sees</span>
       </div>
     </div>
   </div>

@@ -86,10 +86,10 @@ fetch("weights.json")
     MODEL = w;
     predictBtn.disabled = false;
     const acc = (w.test_accuracy * 100).toFixed(2);
-    statusEl.textContent = `Model hazır ✅ (test doğruluğu: %${acc}) — çiz ve bırak, otomatik tahmin eder.`;
+    statusEl.textContent = `Model ready ✅ (test accuracy: %${acc}) — draw and release, it predicts automatically.`;
   })
   .catch((err) => {
-    statusEl.textContent = "Model yüklenemedi: " + err.message;
+    statusEl.textContent = "Failed to load model: " + err.message;
   });
 
 // --- 28x28 on-isleme (senin Python kodundakiyle ayni mantik) ---
@@ -158,18 +158,18 @@ function forward(input) {
 function predict() {
   const input = preprocess();
   if (!input) {
-    statusEl.textContent = "Önce bir şey çiz ✏️";
+    statusEl.textContent = "Draw something first ✏️";
     return;
   }
   const probs = forward(input);
   const best = probs.indexOf(Math.max(...probs));
   digitEl.textContent = best;
-  confEl.textContent = `bu sayıya %${(probs[best] * 100).toFixed(1)} emin`;
+  confEl.textContent = `${(probs[best] * 100).toFixed(1)}% confident`;
   for (let d = 0; d <= 9; d++) {
     const row = document.getElementById("bar" + d);
     row.querySelector(".fill").style.width = (probs[d] * 100).toFixed(1) + "%";
     row.querySelector(".pct").textContent = "%" + (probs[d] * 100).toFixed(1);
     row.classList.toggle("top", d === best);
   }
-  statusEl.textContent = "Tahmin hazır ✅ — değiştirmek için üstüne çizmeye devam et.";
+  statusEl.textContent = "Prediction ready ✅ — keep drawing on top to change it.";
 }
