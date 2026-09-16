@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rakam Tanıma AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #111318; color: #f0f0f0;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 12px 48px;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  p.sub { color: #9aa0aa; margin-bottom: 20px; font-size: .95rem; text-align: center; }
+  .wrap { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .card { background: #1b1e24; border-radius: 12px; padding: 16px; }
+  #pad {
+    touch-action: none; cursor: crosshair;
+    border-radius: 8px; display: block;
+    width: min(78vw, 320px); height: min(78vw, 320px);
+  }
+  .btns { display: flex; gap: 10px; margin-top: 12px; }
+  button {
+    flex: 1; padding: 12px; font-size: 1rem; border: none; border-radius: 8px;
+    cursor: pointer; font-weight: 600;
+  }
+  #predictBtn { background: #4a7de2; color: #fff; }
+  #clearBtn { background: #2a2e36; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .result { min-width: min(86vw, 320px); }
+  .big { font-size: 4rem; font-weight: 800; text-align: center; line-height: 1; }
+  .big small { font-size: 1rem; color: #9aa0aa; display: block; font-weight: 400; }
+  .bar { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: .85rem; }
+  .bar .lbl { width: 12px; text-align: right; color: #9aa0aa; }
+  .bar .track { flex: 1; background: #2a2e36; border-radius: 4px; height: 16px; overflow: hidden; }
+  .bar .fill { background: #4a7de2; height: 100%; width: 0%; transition: width .2s; }
+  .bar.top .fill { background: #37c26a; }
+  .bar .pct { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+  #seen { image-rendering: pixelated; width: 84px; height: 84px; border-radius: 6px; background: #000; }
+  .seenrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: #9aa0aa; font-size: .8rem; }
+  #status { margin-top: 12px; color: #9aa0aa; font-size: .85rem; text-align: center; min-height: 1.2em; }
+</style>
+</head>
+<body>
+  <h1>✍️ Rakam Tanıma AI</h1>
+  <p class="sub">Bir rakam çiz (0–9), yapay zekâ ne olduğunu tahmin etsin.<br>Model: senin notebook'undaki ağ (784 → 10 → 10).</p>
+
+  <div class="wrap">
+    <div class="card">
+      <canvas id="pad" width="280" height="280"></canvas>
+      <div class="btns">
+        <button id="predictBtn" disabled>Tahmin Et</button>
+        <button id="clearBtn">Temizle</button>
+      </div>
+      <div id="status">Model yükleniyor…</div>
+    </div>
+
+    <div class="card result">
+      <div class="big"><span id="digit">–</span><small id="conf"></small></div>
+      <div id="bars" style="margin-top:12px"></div>
+      <div class="seenrow">
+        <canvas id="seen" width="28" height="28"></canvas>
+        <span>Ağın gördüğü<br>28×28 görüntü</span>
+      </div>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>
