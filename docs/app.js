@@ -233,46 +233,28 @@ function backward_for_class(target_class, cache) {
   return grad_h; // gradient w.r.t input (784)
 }
 
-function train_step(input, target_class, lr = 0.05) {
+function train_step(input, target_class, lr = 0.01) {
   const { probs, cache } = forward_with_cache(input);
   let g = probs.slice();
   g[target_class] -= 1; // gradient of cross-entropy loss wrt logits
   
+  // Freeze hidden layers to completely prevent catastrophic forgetting.
+  // ONLY fine-tune the final classification layer (Linear Probing).
   const L = MODEL.layers;
-  for (let l = L.length - 1; l >= 0; l--) {
-    const W = L[l].W;
-    const b = L[l].b;
-    const h_in = cache[l].h; // previous layer activation or input
-    
-    const g_in = new Array(h_in.length).fill(0);
-    
-    // Update weights and compute gradient for next layer down
-    for (let i = 0; i < W.length; i++) {
-      let sum = 0;
-      const h_val = h_in[i];
-      const row = W[i];
-      for (let j = 0; j < row.length; j++) {
-        const gj = g[j];
-        sum += row[j] * gj;
-        // W = W - lr * (dL/dW)
-        row[j] -= lr * h_val * gj;
-      }
-      g_in[i] = sum;
+  const l = L.length - 1; 
+  const W = L[l].W;
+  const b = L[l].b;
+  const h_in = cache[l].h; // previous layer activation
+  
+  for (let i = 0; i < W.length; i++) {
+    const h_val = h_in[i];
+    const row = W[i];
+    for (let j = 0; j < row.length; j++) {
+      row[j] -= lr * h_val * g[j];
     }
-    
-    // Update biases
-    for (let j = 0; j < b.length; j++) {
-      b[j] -= lr * g[j];
-    }
-    
-    // Backprop through ReLU if not the first layer
-    if (l > 0) {
-      const z_prev = cache[l].z;
-      for (let i = 0; i < z_prev.length; i++) {
-        if (z_prev[i] <= 0) g_in[i] = 0;
-      }
-    }
-    g = g_in;
+  }
+  for (let j = 0; j < b.length; j++) {
+    b[j] -= lr * g[j];
   }
 }
 
