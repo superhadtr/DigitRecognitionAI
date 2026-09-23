@@ -12,6 +12,7 @@ const barsEl = document.getElementById("bars");
 const N = 280;
 let MODEL = null;
 let drawing = false;
+let last_input = null;
 
 // --- canvas setup: black background (MNIST standard) ---
 function resetPad() {
@@ -62,8 +63,30 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   document.querySelectorAll(".bar").forEach((b) => b.classList.remove("top"));
   seenCtx.fillStyle = "#000";
   seenCtx.fillRect(0, 0, 28, 28);
+  const hCtx = document.getElementById("heatmap")?.getContext("2d");
+  if (hCtx) {
+    hCtx.fillStyle = "#000";
+    hCtx.fillRect(0, 0, 28, 28);
+  }
+  document.getElementById("correction").style.display = "none";
+  last_input = null;
 });
 predictBtn.addEventListener("click", predict);
+
+// --- feedback loop ---
+document.querySelectorAll(".corrBtn").forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    if (!last_input) return;
+    const target = parseInt(e.target.dataset.val);
+    // Take a few gradient steps so the effect is immediate and satisfying
+    for (let i = 0; i < 3; i++) {
+      train_step(last_input, target, 0.1);
+    }
+    // Re-predict to show updated results
+    predict();
+    statusEl.textContent = `Thanks! I updated my weights to learn this is a ${target}. ✅`;
+  });
+});
 
 // --- percentage bars ---
 for (let d = 0; d <= 9; d++) {
@@ -148,26 +171,101 @@ function matvec(x, W, b) { // W: [in][out]
   for (let j = 0; j < out.length; j++) out[j] += b[j];
   return out;
 }
-function forward(input) {
+function forward_with_cache(input) {
   let h = input;
+  const cache = [{ h: h.slice() }];
   const L = MODEL.layers;
   for (let l = 0; l < L.length; l++) {
     h = matvec(h, L[l].W, L[l].b);
+    let z = h.slice();
     if (l < L.length - 1) h = relu(h);
+    cache.push({ z: z, h: h.slice() });
   }
   const mx = Math.max(...h);
   const e = h.map((v) => Math.exp(v - mx));
   const sum = e.reduce((a, b) => a + b, 0);
-  return e.map((v) => v / sum);
+  return { probs: e.map((v) => v / sum), cache };
+}
+
+function backward_for_class(target_class, cache) {
+  const L = MODEL.layers;
+  let grad_h = new Array(10).fill(0);
+  grad_h[target_class] = 1.0;
+  
+  for (let l = L.length - 1; l >= 0; l--) {
+    if (l < L.length - 1) {
+      const z = cache[l + 1].z;
+      for (let i = 0; i < z.length; i++) {
+        if (z[i] <= 0) grad_h[i] = 0;
+      }
+    }
+    const W = L[l].W;
+    const grad_in = new Array(W.length).fill(0);
+    for (let i = 0; i < W.length; i++) {
+      let sum = 0;
+      const row = W[i];
+      const len = row.length;
+      for (let j = 0; j < len; j++) sum += row[j] * grad_h[j];
+      grad_in[i] = sum;
+    }
+    grad_h = grad_in;
+  }
+  return grad_h; // gradient w.r.t input (784)
+}
+
+function train_step(input, target_class, lr = 0.05) {
+  const { probs, cache } = forward_with_cache(input);
+  let g = probs.slice();
+  g[target_class] -= 1; // gradient of cross-entropy loss wrt logits
+  
+  const L = MODEL.layers;
+  for (let l = L.length - 1; l >= 0; l--) {
+    const W = L[l].W;
+    const b = L[l].b;
+    const h_in = cache[l].h; // previous layer activation or input
+    
+    const g_in = new Array(h_in.length).fill(0);
+    
+    // Update weights and compute gradient for next layer down
+    for (let i = 0; i < W.length; i++) {
+      let sum = 0;
+      const h_val = h_in[i];
+      const row = W[i];
+      for (let j = 0; j < row.length; j++) {
+        const gj = g[j];
+        sum += row[j] * gj;
+        // W = W - lr * (dL/dW)
+        row[j] -= lr * h_val * gj;
+      }
+      g_in[i] = sum;
+    }
+    
+    // Update biases
+    for (let j = 0; j < b.length; j++) {
+      b[j] -= lr * g[j];
+    }
+    
+    // Backprop through ReLU if not the first layer
+    if (l > 0) {
+      const z_prev = cache[l].z;
+      for (let i = 0; i < z_prev.length; i++) {
+        if (z_prev[i] <= 0) g_in[i] = 0;
+      }
+    }
+    g = g_in;
+  }
 }
 
 function predict() {
   const input = preprocess();
   if (!input) {
     statusEl.textContent = "Draw something first ✏️";
+    document.getElementById("correction").style.display = "none";
     return;
   }
-  const probs = forward(input);
+  last_input = input;
+  document.getElementById("correction").style.display = "block";
+  const { probs, cache } = forward_with_cache(input);
   const best = probs.indexOf(Math.max(...probs));
   digitEl.textContent = best;
   confEl.textContent = `${(probs[best] * 100).toFixed(1)}% confident`;
@@ -177,5 +275,47 @@ function predict() {
     row.querySelector(".pct").textContent = "%" + (probs[d] * 100).toFixed(1);
     row.classList.toggle("top", d === best);
   }
+  
+  // -- Draw Heatmap (Gradient x Input) --
+  const grad = backward_for_class(best, cache);
+  let maxVal = 0;
+  const saliency = new Array(784).fill(0);
+  for (let i = 0; i < 784; i++) {
+    saliency[i] = grad[i] * input[i]; // How much this specific stroke helped
+    if (Math.abs(saliency[i]) > maxVal) maxVal = Math.abs(saliency[i]);
+  }
+  
+  const heatmap = document.getElementById("heatmap");
+  if (heatmap) {
+    const hCtx = heatmap.getContext("2d");
+    const hImg = hCtx.createImageData(28, 28);
+    for (let i = 0; i < 784; i++) {
+      const idx = i * 4;
+      const val = maxVal > 0 ? saliency[i] / maxVal : 0;
+      const base = input[i] * 255;
+      
+      // If it's a stroke (base > 0), color it based on contribution
+      if (val > 0) {
+        // Positive: tint green
+        hImg.data[idx] = Math.max(0, base - val * 255); // R
+        hImg.data[idx + 1] = Math.min(255, base + val * 255); // G
+        hImg.data[idx + 2] = Math.max(0, base - val * 255); // B
+      } else if (val < 0) {
+        // Negative: tint red
+        hImg.data[idx] = Math.min(255, base - val * 255); // R (-val is positive)
+        hImg.data[idx + 1] = Math.max(0, base + val * 255); // G
+        hImg.data[idx + 2] = Math.max(0, base + val * 255); // B
+      } else {
+        // Neutral or background
+        hImg.data[idx] = base;
+        hImg.data[idx + 1] = base;
+        hImg.data[idx + 2] = base;
+      }
+      hImg.data[idx + 3] = 255; // Opaque
+    }
+    hCtx.putImageData(hImg, 0, 0);
+  }
+  
+  // Only update status if it wasn't just updated by the correction feedback
   statusEl.textContent = "Prediction ready ✅ — keep drawing on top to change it.";
 }

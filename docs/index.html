@@ -38,9 +38,11 @@
   .bar .fill { background: #4a7de2; height: 100%; width: 0%; transition: width .2s; }
   .bar.top .fill { background: #37c26a; }
   .bar .pct { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
-  #seen { image-rendering: pixelated; width: 84px; height: 84px; border-radius: 6px; background: #000; }
-  .seenrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: #9aa0aa; font-size: .8rem; }
+  #seen, #heatmap { image-rendering: pixelated; width: 84px; height: 84px; border-radius: 6px; background: #000; display: block; margin: 0 auto; }
+  .seenrow { display: flex; align-items: flex-start; justify-content: center; gap: 20px; margin-top: 12px; color: #9aa0aa; font-size: .8rem; text-align: center; }
   #status { margin-top: 12px; color: #9aa0aa; font-size: .85rem; text-align: center; min-height: 1.2em; }
+  .corrBtn { padding: 6px 0; font-size: 0.9rem; background: #1b1e24; color: #fff; border: 1px solid #4a7de2; border-radius: 4px; flex: 1; min-width: 28px; }
+  .corrBtn:hover { background: #4a7de2; }
 </style>
 </head>
 <body>
@@ -61,8 +63,30 @@
       <div class="big"><span id="digit">–</span><small id="conf"></small></div>
       <div id="bars" style="margin-top:12px"></div>
       <div class="seenrow">
-        <canvas id="seen" width="28" height="28"></canvas>
-        <span>The 28×28 image<br>the network sees</span>
+        <div>
+          <canvas id="seen" width="28" height="28"></canvas>
+          <span style="display:block; margin-top:4px;">The 28×28 image<br>the network sees</span>
+        </div>
+        <div>
+          <canvas id="heatmap" width="28" height="28"></canvas>
+          <span style="display:block; margin-top:4px;">AI Analysis<br><span style="color:#37c26a">Green</span>=Helped, <span style="color:#e24a4a">Red</span>=Hurt</span>
+        </div>
+      </div>
+      
+      <div id="correction" style="display:none; margin-top:20px; background:#2a2e36; padding:12px; border-radius:8px;">
+        <div style="font-size:0.85rem; color:#9aa0aa; margin-bottom:8px; text-align:center;">Wrong guess? Teach the AI (Online Learning):</div>
+        <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+          <button class="corrBtn" data-val="0">0</button>
+          <button class="corrBtn" data-val="1">1</button>
+          <button class="corrBtn" data-val="2">2</button>
+          <button class="corrBtn" data-val="3">3</button>
+          <button class="corrBtn" data-val="4">4</button>
+          <button class="corrBtn" data-val="5">5</button>
+          <button class="corrBtn" data-val="6">6</button>
+          <button class="corrBtn" data-val="7">7</button>
+          <button class="corrBtn" data-val="8">8</button>
+          <button class="corrBtn" data-val="9">9</button>
+        </div>
       </div>
     </div>
   </div>
