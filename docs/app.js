@@ -53,8 +53,19 @@ function stopDraw() {
 pad.addEventListener("pointerup", stopDraw);
 pad.addEventListener("pointercancel", stopDraw);
 
+let isEraser = false;
+const eraserBtn = document.getElementById("eraserBtn");
+eraserBtn.addEventListener("click", () => {
+  isEraser = !isEraser;
+  eraserBtn.classList.toggle("active", isEraser);
+  ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+});
+
 document.getElementById("clearBtn").addEventListener("click", () => {
   resetPad();
+  isEraser = false;
+  eraserBtn.classList.remove("active");
+  ctx.globalCompositeOperation = "source-over";
   digitEl.textContent = "–";
   confEl.textContent = "";
   document.querySelectorAll(".bar .fill").forEach((f) => (f.style.width = "0%"));
@@ -66,6 +77,11 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   if (hCtx) {
     hCtx.fillStyle = "#000";
     hCtx.fillRect(0, 0, 28, 28);
+  }
+  const hlCtx = document.getElementById("hiddenLayer")?.getContext("2d");
+  if (hlCtx) {
+    hlCtx.fillStyle = "#000";
+    hlCtx.fillRect(0, 0, 8, 8);
   }
   document.getElementById("correction").style.display = "none";
   last_input = null;
@@ -115,13 +131,13 @@ fetch("weights.json")
     statusEl.textContent = "Failed to load model: " + err.message;
   });
 
-// --- 28x28 preprocessing (same logic as the Python code) ---
+// --- 28x28 preprocessing with Center of Mass alignment ---
 function preprocess() {
   const img = ctx.getImageData(0, 0, N, N).data;
   let x0 = N, y0 = N, x1 = -1, y1 = -1;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
-      if (img[(y * N + x) * 4] > 20) { // is there a white pixel
+      if (img[(y * N + x) * 4] > 20) {
         if (x < x0) x0 = x;
         if (x > x1) x1 = x;
         if (y < y0) y0 = y;
@@ -129,26 +145,55 @@ function preprocess() {
       }
     }
   }
-  if (x1 < 0) return null; // empty canvas
+  if (x1 < 0) return null;
 
   const m = 14;
   x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m);
   x1 = Math.min(N - 1, x1 + m); y1 = Math.min(N - 1, y1 + m);
   const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
 
-  // put the cropped region on a temporary canvas
   const crop = document.createElement("canvas");
   crop.width = cw; crop.height = ch;
   crop.getContext("2d").putImageData(ctx.getImageData(x0, y0, cw, ch), 0, 0);
 
-  // keep aspect ratio, fit into 20x20, center on 28x28
   const s = 20 / Math.max(cw, ch);
   const w = Math.max(1, Math.round(cw * s)), h = Math.max(1, Math.round(ch * s));
+  
+  // Temporary canvas to calculate Center of Mass
+  const tmpCanvas = document.createElement("canvas");
+  tmpCanvas.width = 28; tmpCanvas.height = 28;
+  const tmpCtx = tmpCanvas.getContext("2d");
+  tmpCtx.fillStyle = "#000";
+  tmpCtx.fillRect(0, 0, 28, 28);
+  tmpCtx.imageSmoothingEnabled = true;
+  tmpCtx.imageSmoothingQuality = "high";
+  tmpCtx.drawImage(crop, Math.floor((28 - w) / 2), Math.floor((28 - h) / 2), w, h);
+  
+  // Calculate Center of Mass
+  const tmpData = tmpCtx.getImageData(0, 0, 28, 28).data;
+  let mass = 0, comX = 0, comY = 0;
+  for (let y = 0; y < 28; y++) {
+    for (let x = 0; x < 28; x++) {
+      const val = tmpData[(y * 28 + x) * 4];
+      if (val > 0) {
+        mass += val;
+        comX += x * val;
+        comY += y * val;
+      }
+    }
+  }
+  
   seenCtx.fillStyle = "#000";
   seenCtx.fillRect(0, 0, 28, 28);
-  seenCtx.imageSmoothingEnabled = true;
-  seenCtx.imageSmoothingQuality = "high";
-  seenCtx.drawImage(crop, Math.floor((28 - w) / 2), Math.floor((28 - h) / 2), w, h);
+  if (mass > 0) {
+    comX /= mass;
+    comY /= mass;
+    const shiftX = Math.round(14 - comX);
+    const shiftY = Math.round(14 - comY);
+    seenCtx.drawImage(tmpCanvas, shiftX, shiftY);
+  } else {
+    seenCtx.drawImage(tmpCanvas, 0, 0);
+  }
 
   const px = seenCtx.getImageData(0, 0, 28, 28).data;
   const input = new Array(784);
@@ -294,6 +339,30 @@ function predict() {
       hImg.data[idx + 3] = 255; // Opaque
     }
     hCtx.putImageData(hImg, 0, 0);
+  }
+  
+  // -- Draw Hidden Layer (64 neurons as 8x8) --
+  const hlCanvas = document.getElementById("hiddenLayer");
+  if (hlCanvas && cache[2]) {
+    const hlCtx = hlCanvas.getContext("2d");
+    const hlData = hlCtx.createImageData(8, 8);
+    const h64 = cache[2].h; // The 64 features
+    let hMax = Math.max(...h64, 0.001);
+    for (let i = 0; i < 64; i++) {
+      const val = (h64[i] / hMax) * 255;
+      const idx = i * 4;
+      hlData.data[idx] = 74;   // #4a7de2 (blue-ish tint)
+      hlData.data[idx+1] = 125;
+      hlData.data[idx+2] = 226;
+      hlData.data[idx+3] = Math.floor(val); // Alpha based on activation
+    }
+    hlCtx.fillStyle = "#000";
+    hlCtx.fillRect(0, 0, 8, 8);
+    // Temp canvas for alpha blending since putImageData overwrites alpha
+    const tmp = document.createElement("canvas");
+    tmp.width = 8; tmp.height = 8;
+    tmp.getContext("2d").putImageData(hlData, 0, 0);
+    hlCtx.drawImage(tmp, 0, 0);
   }
   
   // Only update status if it wasn't just updated by the correction feedback
