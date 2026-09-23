@@ -77,14 +77,35 @@ document.querySelectorAll(".corrBtn").forEach((btn) => {
   btn.addEventListener("click", (e) => {
     if (!last_input) return;
     const target = parseInt(e.target.dataset.val);
-    // Take a few gradient steps so the effect is immediate and satisfying
-    for (let i = 0; i < 3; i++) {
-      train_step(last_input, target, 0.1);
-    }
+    // Use a very small learning rate and only 1 step to prevent "Catastrophic Forgetting"
+    train_step(last_input, target, 0.01);
+    
     // Re-predict to show updated results
     predict();
-    statusEl.textContent = `Thanks! I updated my weights to learn this is a ${target}. ✅`;
+    statusEl.textContent = `✅ I nudged my weights towards ${target}. (It learns slowly to not forget other digits!)`;
   });
+});
+
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  if (!last_input) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 28;
+  canvas.height = 28;
+  const dCtx = canvas.getContext("2d");
+  const imgData = dCtx.createImageData(28, 28);
+  for (let i=0; i<784; i++) {
+    const val = Math.floor(last_input[i] * 255);
+    imgData.data[i*4] = val;
+    imgData.data[i*4+1] = val;
+    imgData.data[i*4+2] = val;
+    imgData.data[i*4+3] = 255;
+  }
+  dCtx.putImageData(imgData, 0, 0);
+  
+  const link = document.createElement("a");
+  link.download = `my_digit_${digitEl.textContent || "unknown"}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
 });
 
 // --- percentage bars ---
@@ -316,5 +337,7 @@ function predict() {
   }
   
   // Only update status if it wasn't just updated by the correction feedback
-  statusEl.textContent = "Prediction ready ✅ — keep drawing on top to change it.";
+  if (!statusEl.textContent.includes("nudged")) {
+    statusEl.textContent = "Prediction ready ✅ — keep drawing on top to change it.";
+  }
 }
