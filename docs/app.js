@@ -49,7 +49,6 @@ function stopDraw() {
   if (!drawing) return;
   drawing = false;
   ctx.beginPath(); // close the unfinished stroke
-  if (MODEL) predict(); // auto-predict
 }
 pad.addEventListener("pointerup", stopDraw);
 pad.addEventListener("pointercancel", stopDraw);
