@@ -77,8 +77,8 @@ document.querySelectorAll(".corrBtn").forEach((btn) => {
   btn.addEventListener("click", (e) => {
     if (!last_input) return;
     const target = parseInt(e.target.dataset.val);
-    // Use a very small learning rate and only 1 step to prevent "Catastrophic Forgetting"
-    train_step(last_input, target, 0.01);
+    // Use a very very small learning rate so it behaves like 1 out of 1000 examples
+    train_step(last_input, target, 0.001);
     
     // Re-predict to show updated results
     predict();
